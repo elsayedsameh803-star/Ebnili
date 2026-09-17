@@ -24,7 +24,10 @@ VITE_APP_URL=http://localhost:5173
 VITE_ADMIN_EMAIL=admin@example.com
 ```
 
-> `VITE_ADMIN_EMAIL` هو بريد المالك الذي تصل إليه إشعارات الاشتراكات في لوحة التحكم.
+> `VITE_ADMIN_EMAIL` محجوز للتوثيق فقط وغير مستخدم حاليًا في الكود (صلاحية المالك تُحدَّد
+> عبر `users.role = 'owner'`)، و`VITE_APP_URL` غير مُستخدَم في الكود أيضًا. المتغيران
+> المؤثران فعليًا هما `VITE_SUPABASE_URL` و `VITE_SUPABASE_ANON_KEY` وكذلك
+> `VITE_ORANGE_CASH_NUMBER` (يُقرأ في `src/lib/auth.ts`).
 
 ## 3) قاعدة البيانات
 
@@ -52,6 +55,54 @@ npm run lint       # ESLint
 - ضع صورة المشاركة في `public/og-image.png` بمقاس **1200×630** (مشار إليها في `index.html`).
 - حدّث `public/sitemap.xml` و `public/robots.txt` بالنطاق النهائي بدل `https://ebnili.com`.
 - تأكد أن `VITE_APP_URL` يشير إلى النطاق الحقيقي.
+
+## 6) النشر على Vercel
+
+المشروع مُهيّأ للنشر مباشرة عبر `vercel.json` (يكتشف Vite، يبني إلى `dist`، ويحوّل كل
+المسارات إلى `index.html` حتى يعمل التوجيه في الواجهة، مع ترويسات أمان وكاش طويل للأصول).
+
+### أ) الطريقة السريعة (Dashboard)
+
+1. ارفع الكود إلى GitHub.
+2. من Vercel: **Add New → Project → Import Git Repository** واختر المستودع.
+3. Vercel سيضبط تلقائيًا: Framework `Vite`، Build `npm run build`، Output `dist`.
+4. أضف متغيرات البيئة (Environment Variables) قبل أول نشر (انظر أدناه).
+5. **Deploy**.
+
+### ب) طريقة CLI
+
+```bash
+npm i -g vercel          # تثبيت CLI
+vercel login             # تسجيل الدخول (يفتح المتصفح)
+vercel link --project ebnili --yes    # ربط المجلد بمشروع Vercel
+vercel --prod --yes      # نشر الإنتاج
+```
+
+أو باستخدام توكن بدون تسجيل دخول تفاعلي:
+
+```bash
+vercel link --project ebnili --yes --token <VERCEL_TOKEN>
+vercel --prod --yes --token <VERCEL_TOKEN>
+```
+
+### ج) متغيرات البيئة على Vercel
+
+```bash
+vercel env add VITE_SUPABASE_URL production --value "https://<project-id>.supabase.co" --yes
+vercel env add VITE_SUPABASE_ANON_KEY production --value "<anon-key>" --yes
+vercel env add VITE_ORANGE_CASH_NUMBER production --value "01207782741" --yes
+```
+
+> أضف المتغيرات قبل النشر، وبعد أي تعديل عليها أعد النشر لأن قيم `VITE_*` تُدمج وقت البناء.
+> بدون مفاتيح Supabase حقيقية يعمل الموقع لكن في الوضع المحلي (تخزين `localStorage`) ولن
+> تُجلب بيانات المستخدمين/الاشتراكات إلى لوحة المالك.
+
+### د) بعد النشر
+
+- أضف `public/og-image.png` (1200×630) لصورة المشاركة في وسائل التواصل.
+- استبدل `https://ebnili.com` بالنطاق النهائي في: `index.html` (og:url / og:image /
+  canonical)، `public/sitemap.xml`، `public/robots.txt`.
+- من Vercel: **Settings → Domains** لإضافة النطاق المخصّص.
 
 ## ملاحظات معمارية
 
