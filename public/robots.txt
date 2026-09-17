@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://ebnili.com/sitemap.xml
