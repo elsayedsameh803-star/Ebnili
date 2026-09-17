@@ -1,3 +1,4 @@
 User-agent: *
 Allow: /
-Sitemap: https://ebnili.com/sitemap.xml
+
+Sitemap: https://ebnili.vercel.app/sitemap.xml
