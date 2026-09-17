@@ -1,3 +1,4 @@
+# Logs
 logs
 *.log
 npm-debug.log*
@@ -6,11 +7,23 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+
+# Build output
 dist
 dist-ssr
-*.local
 
+# Local env files — never commit secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Vercel CLI link state (account-scoped, never commit)
+.vercel
+
+# Editors / OS
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -20,8 +33,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.env
-.vercel
-
-.vercel
-.env*

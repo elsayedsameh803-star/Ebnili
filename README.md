@@ -52,11 +52,16 @@ npm run lint       # ESLint
 
 ## 5) قبل النشر
 
-- ضع صورة المشاركة في `public/og-image.png` بمقاس **1200×630** (مشار إليها في `index.html`).
-- حدّث `public/sitemap.xml` و `public/robots.txt` بالنطاق النهائي بدل `https://ebnili.com`.
-- تأكد أن `VITE_APP_URL` يشير إلى النطاق الحقيقي.
+- [x] `public/og-image.png` بمقاس **1200×630** — موجودة (صورة العلامة، وليست placeholder).
+- [x] `public/sitemap.xml` و `public/robots.txt` يشيران إلى النطاق الفعلي `https://ebnili.vercel.app`.
+- [x] كل روابط `index.html` (og:url / og:image / twitter:image / canonical) على النطاق الفعلي.
+- [ ] املأ مفاتيح Supabase الحقيقية (انظر القسم 2) ثم أعد النشر.
+- [ ] إن أضفت نطاقًا مخصّصًا، حدّث الروابط الأربعة أعلاه + `VITE_APP_URL`.
 
 ## 6) النشر على Vercel
+
+> **✅ منشور حاليًا:** https://ebnili.vercel.app
+> المشروع: `sameh-elkwaga-s-projects/ebnili` — Framework: `Vite` (تلقائي)، Build: `npm run build`، Output: `dist`.
 
 المشروع مُهيّأ للنشر مباشرة عبر `vercel.json` (يكتشف Vite، يبني إلى `dist`، ويحوّل كل
 المسارات إلى `index.html` حتى يعمل التوجيه في الواجهة، مع ترويسات أمان وكاش طويل للأصول).
@@ -85,24 +90,46 @@ vercel link --project ebnili --yes --token <VERCEL_TOKEN>
 vercel --prod --yes --token <VERCEL_TOKEN>
 ```
 
+> **ملاحظتان مهمّتان أثناء الربط:**
+> 1. `vercel link` ينشئ ملف `.env.local` (توكن OIDC) ويضيفه إلى `.gitignore` — لا ترفعه.
+> 2. إذا فعل Vercel **Deployment Protection → Vercel Authentication** فسيرجع الموقع 302
+>    إلى صفحة تسجيل الدخول للزوّار. عطّلها من
+>    **Settings → Deployment Protection** أو عبر API:
+>    `vercel api /v9/projects/<project> -X PATCH --input` مع `{"ssoProtection": null}`.
+
 ### ج) متغيرات البيئة على Vercel
 
 ```bash
-vercel env add VITE_SUPABASE_URL production --value "https://<project-id>.supabase.co" --yes
-vercel env add VITE_SUPABASE_ANON_KEY production --value "<anon-key>" --yes
-vercel env add VITE_ORANGE_CASH_NUMBER production --value "01207782741" --yes
+# متغيّرة عامة (تُدمج في حزمة الواجهة) — لاحظ --no-sensitive و --yes
+vercel env add VITE_ORANGE_CASH_NUMBER production,preview,development \
+  --value "01207782741" --yes --no-sensitive
+vercel env add VITE_APP_URL production,preview,development \
+  --value "https://ebnili.vercel.app" --yes --no-sensitive
+vercel env add VITE_ADMIN_EMAIL production,preview,development \
+  --value "<owner-email>" --yes --no-sensitive
+
+# متغيّرات Supabase (نفس الصيغة)
+vercel env add VITE_SUPABASE_URL production,preview,development \
+  --value "https://<project-id>.supabase.co" --yes --no-sensitive
+vercel env add VITE_SUPABASE_ANON_KEY production,preview,development \
+  --value "<anon-key>" --yes --no-sensitive
 ```
 
-> أضف المتغيرات قبل النشر، وبعد أي تعديل عليها أعد النشر لأن قيم `VITE_*` تُدمج وقت البناء.
-> بدون مفاتيح Supabase حقيقية يعمل الموقع لكن في الوضع المحلي (تخزين `localStorage`) ولن
-> تُجلب بيانات المستخدمين/الاشتراكات إلى لوحة المالك.
+> - `vercel env add` يجعل القيمة **sensitive افتراضيًا**، وVercel لا يدعم القيم الحسّاسة في
+>   بيئة Development — لذلك يجب `--no-sensitive` عند إضافة المتغير للثلاث بيئات معًا.
+>   (قيم `VITE_*` تظهر في حزمة الواجهة على أي حال، فلا فرق أمني.)
+> - أضف المتغيرات قبل النشر، وبعد أي تعديل عليها أعد النشر لأن قيم `VITE_*` تُدمج وقت البناء.
+> - بدون مفاتيح Supabase حقيقية يعمل الموقع لكن في الوضع المحلي (تخزين `localStorage`) ولن
+>   تُجلب بيانات المستخدمين/الاشتراكات إلى لوحة المالك.
 
 ### د) بعد النشر
 
-- أضف `public/og-image.png` (1200×630) لصورة المشاركة في وسائل التواصل.
-- استبدل `https://ebnili.com` بالنطاق النهائي في: `index.html` (og:url / og:image /
-  canonical)، `public/sitemap.xml`، `public/robots.txt`.
-- من Vercel: **Settings → Domains** لإضافة النطاق المخصّص.
+- ✅ `public/og-image.png` (1200×630، مولّدة) موجودة وتُخدم بنجاح — صورة المشاركة تعمل.
+- ✅ `index.html` (og:url / og:image / twitter:image / canonical)، `public/robots.txt`،
+  `public/sitemap.xml` كلها تشير الآن إلى `https://ebnili.vercel.app`.
+- لاستخدام نطاق مخصّص: **Settings → Domains**، ثم حدّث `VITE_APP_URL` (أو أعِد النشر بعد
+  تحديث الروابط الثابتة في `index.html` و`robots.txt` و`sitemap.xml`).
+- نطاق `ebnili.com` مسجّل لكنه مربوط بمشروع آخر (تطبيق Next.js)، وليس بهذا المشروع.
 
 ## ملاحظات معمارية
 
