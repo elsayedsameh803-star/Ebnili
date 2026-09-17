@@ -90,6 +90,12 @@ function extractHtml(raw: string): string {
     text = text.slice(0, endMatch.index + endMatch[0].length);
   }
 
+  // Models sometimes omit the doctype; without it browsers fall back to
+  // quirks mode, which subtly breaks modern layout inside the preview iframe.
+  if (!/^<!DOCTYPE/i.test(text)) {
+    text = '<!DOCTYPE html>\n' + text;
+  }
+
   return text.trim();
 }
 
