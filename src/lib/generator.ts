@@ -1,4 +1,5 @@
 import type { Template } from './types';
+import { generateWithGemini, type GenerateFailure } from './gemini';
 
 type GenerationCallbacks = {
   onStatus: (status: string) => void;
@@ -323,27 +324,45 @@ export function generateCode(prompt: string, template?: Template): string {
   }
 }
 
-const STREAM_TOKENS = [
-  'Analyzing your prompt',
-  'Identifying components',
-  'Selecting design system',
-  'Generating HTML structure',
-  'Applying styles',
-  'Adding interactivity',
-  'Optimizing layout',
-  'Finalizing preview',
-];
-
 export async function streamGenerate(
   prompt: string,
   template: Template | undefined,
   callbacks: GenerationCallbacks
 ): Promise<string> {
-  for (const status of STREAM_TOKENS) {
-    callbacks.onStatus(status);
-    await new Promise((r) => setTimeout(r, 250 + Math.random() * 200));
+  const categoryLabel = template?.category ?? detectCategory(prompt);
+
+  callbacks.onStatus('إرسال الوصف إلى Gemini');
+  await new Promise((r) => setTimeout(r, 120));
+
+  try {
+    const result = await generateWithGemini(prompt, categoryLabel);
+
+    callbacks.onStatus(`استقبال الكود من ${result.model}`);
+    await new Promise((r) => setTimeout(r, 120));
+
+    callbacks.onStatus('تنظيف وتجهيز المعاينة');
+    await new Promise((r) => setTimeout(r, 120));
+
+    callbacks.onStatus('تم — Gemini');
+    return result.code;
+  } catch (err) {
+    const failure = err as GenerateFailure;
+
+    // Surface the real cause, then keep the app useful by falling back to the
+    // deterministic local template so the user still gets a working preview.
+    const reasons: Record<GenerateFailure['reason'], string> = {
+      'no-key': 'المفتاح غير مُعد على السيرفر',
+      unavailable: 'Gemini مشغول حاليًا',
+      blocked: 'الطلب مرفوض من Gemini',
+      network: 'لا يمكن الوصول لخدمة التوليد',
+      unknown: 'تعذّر التوليد بالذكاء الاصطناعي',
+    };
+    callbacks.onStatus(`${reasons[failure.reason] ?? reasons.unknown} — جارٍ استخدام القالب`);
+
+    console.error('[generate] falling back to local template:', failure);
+
+    const code = generateCode(prompt, template);
+    callbacks.onStatus('تم — قالب محلي');
+    return code;
   }
-  const code = generateCode(prompt, template);
-  callbacks.onStatus('Done');
-  return code;
 }
