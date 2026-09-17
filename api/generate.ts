@@ -73,7 +73,87 @@ function buildUserPrompt(prompt: string, template?: string): string {
 
 /** Removes markdown fences / stray prose that models sometimes add. */
 function extractHtml(raw: string): string {
-  let text = raw.trim();
+  let s = raw;
+  const fenceStart = s.indexOf('```');
+  if (fenceStart !== -1) {
+    const lang = s.slice(fenceStart + 3, fenceStart + 10).trim().toLowerCase();
+    if (lang.startsWith('html') || lang === '' || lang === 'htm') {
+      const after = s.indexOf('\n', fenceStart + 3);
+      const start = after !== -1 ? after + 1 : fenceStart + 3;
+      const fenceEnd = s.indexOf('```', start);
+      if (fenceEnd !== -1) {
+        s = s.slice(start, fenceEnd);
+      } else {
+        s = s.slice(start);
+      }
+    } else {
+      const fenceEnd = s.indexOf('```', fenceStart + 3);
+      if (fenceEnd !== -1) {
+        s = s.slice(0, fenceStart) + s.slice(fenceEnd + 3);
+      }
+    }
+  }
+  const htmlStart = s.indexOf('<!DOCTYPE html>');
+  if (htmlStart !== -1) {
+    s = s.slice(htmlStart);
+  } else {
+    const htmlTag = s.indexOf('<html');
+    if (htmlTag !== -1) {
+      s = s.slice(htmlTag);
+    }
+  }
+  s = s.replace(/^[\s\S]*?<!DOCTYPE html>/i, '<!DOCTYPE html>');
+  s = s.trim();
+  s = s.replace(/^```[\s\S]*?```$/g, '');
+  return s;
+}
+
+/** Accept real HTML even without DOCTYPE on line 1. */
+function isUsableDocument(html: string): boolean {
+  if (!html || html.length < 200) return false;
+  const n = html.toLowerCase();
+  const hasHtml = n.includes('<html');
+  const hasHead = n.includes('<head') || n.includes('</head>');
+  const hasBody = n.includes('<body') || n.includes('</body>');
+  const hasDoctype = n.startsWith('<!doctype') || n.indexOf('<!doctype') !== -1;
+  if (hasHtml && hasHead && hasBody) return true;
+  if (hasDoctype && n.includes('</html>')) return true;
+  return false;
+}et s = raw.trim();
+
+  // Drop markdown code fences if present
+  if (s.startsWith('```')) {
+    const firstNL = s.indexOf('\n');
+    if (firstNL > 0) s = s.slice(firstNL + 1);
+    if (s.startsWith('html') || s.startsWith('HTML')) {
+      const after = s.indexOf('\n');
+      if (after > 0) s = s.slice(after + 1);
+    }
+    if (s.endsWith('```')) {
+      const lastNL = s.lastIndexOf('\n');
+      if (lastNL > 0) s = s.slice(0, lastNL);
+    }
+    s = s.trim();
+  }
+
+  // If still wrapped in fences (e.g. whitespace variants), strip once more
+  s = s.replace(/^```[\s\S]*?```/m, (m) => {
+    const inner = m.replace(/^```/m, '').replace(/```$/m, '').trim();
+    return inner;
+  });
+
+  // Drop leading language hint like ```html
+  s = s.replace(/^html\s*/i, '');
+
+  // Strip any leading markdown blockquote markers
+  while (s.startsWith('>')) {
+    const idx = s.indexOf('\n');
+    if (idx > 0) s = s.slice(idx + 1).trim();
+    else break;
+  }
+
+  return s.trim();
+}et text = raw.trim();
 
   const fenced = text.match(/```(?:html)?\s*([\s\S]*?)```/i);
   if (fenced && fenced[1]) {
