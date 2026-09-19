@@ -228,7 +228,9 @@ function App() {
             {/* Conversation column — mirrors Bolt.new's chat pane */}
             <section
               className={`flex min-w-0 flex-col border-r border-neutral-200 bg-white ${
-                showPreviewPane ? 'hidden w-[420px] shrink-0 lg:flex' : 'flex flex-1'
+                showPreviewPane
+                  ? 'hidden w-[300px] shrink-0 sm:flex lg:w-[420px]'
+                  : 'flex flex-1'
               }`}
             >
               <header className="flex items-center justify-between gap-2 border-b border-neutral-200 px-4 py-2.5">
@@ -330,7 +332,7 @@ function App() {
                 onClose={() => setShowPreviewPane(false)}
               />
             ) : (
-              <section className="hidden flex-1 items-center justify-center bg-neutral-50 lg:flex">
+              <section className="hidden flex-1 items-center justify-center bg-neutral-50 sm:flex">
                 <p className="text-xs text-neutral-400">
                   اضغط على أيقونة اللوحة بالأعلى لإظهار المعاينة
                 </p>

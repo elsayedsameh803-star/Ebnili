@@ -126,7 +126,7 @@ export default function LivePreview({
           <button
             onClick={onClose}
             title="رجوع إلى المحادثة"
-            className="rounded-md p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 lg:hidden"
+            className="rounded-md p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 sm:hidden"
           >
             <ArrowRight size={15} />
           </button>
