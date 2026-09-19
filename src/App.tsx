@@ -327,6 +327,7 @@ function App() {
                 isLoading={isGenerating}
                 projectName={activeProject?.name}
                 onReset={handleResetPreview}
+                onClose={() => setShowPreviewPane(false)}
               />
             ) : (
               <section className="hidden flex-1 items-center justify-center bg-neutral-50 lg:flex">

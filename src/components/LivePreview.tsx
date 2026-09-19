@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ArrowRight,
   Check,
   Code2,
   Copy,
@@ -22,6 +23,8 @@ interface LivePreviewProps {
   isLoading?: boolean;
   projectName?: string;
   onReset?: () => void;
+  /** Mobile-only: returns from the preview back to the conversation column. */
+  onClose?: () => void;
 }
 
 type Viewport = 'mobile' | 'tablet' | 'desktop';
@@ -49,6 +52,7 @@ export default function LivePreview({
   isLoading = false,
   projectName,
   onReset,
+  onClose,
 }: LivePreviewProps) {
   const [viewport, setViewport] = useState<Viewport>('desktop');
   const [viewMode, setViewMode] = useState<ViewMode>('preview');
@@ -118,6 +122,15 @@ export default function LivePreview({
       }`}
     >
       <header className="flex items-center gap-2 border-b border-neutral-200 bg-white px-3 py-2">
+        {onClose && (
+          <button
+            onClick={onClose}
+            title="رجوع إلى المحادثة"
+            className="rounded-md p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 lg:hidden"
+          >
+            <ArrowRight size={15} />
+          </button>
+        )}
         <div className="flex items-center rounded-lg bg-neutral-100 p-0.5">
           <button
             onClick={() => setViewMode('preview')}
