@@ -351,10 +351,11 @@ export async function streamGenerate(
     // Surface the real cause, then keep the app useful by falling back to the
     // deterministic local template so the user still gets a working preview.
     const reasons: Record<GenerateFailure['reason'], string> = {
-      'no-key': 'المفتاح غير مُعد على السيرفر',
+      'no-key': 'مفتاح Gemini غير مُعد (VITE_GEMINI_API_KEY)',
       unavailable: 'Gemini مشغول حاليًا',
       blocked: 'الطلب مرفوض من Gemini',
       network: 'لا يمكن الوصول لخدمة التوليد',
+      'not-found': 'موديل Gemini لم يعد متاحًا',
       unknown: 'تعذّر التوليد بالذكاء الاصطناعي',
     };
     callbacks.onStatus(`${reasons[failure.reason] ?? reasons.unknown} — جارٍ استخدام القالب`);

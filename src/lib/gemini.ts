@@ -2,23 +2,25 @@
  * Direct, in-browser bridge to the Gemini API via the official
  * `@google/genai` SDK (v2.x).
  *
- * Why there is no `/api/generate` fetch any more:
- *  - The dev-time Vite server has no `api/generate.ts` serverless function, so
- *    the previous `fetch('/api/generate', ...)` resolved to a 404 during
- *    `npm run dev` (the route only existed as a Vercel Node function).
- *  - The old `api/generate.ts` fallback referenced model names that do not
- *    exist (`gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, etc.).
+ * This is a front-end-only site, so generation happens straight from the
+ * browser — there is no server proxy and no `/api/generate` route any more:
+ *  - The dev-time Vite server never had an `api/generate.ts` function, so the
+ *    old `fetch('/api/generate', ...)` returned 404 during `npm run dev`.
+ *  - Vercel deployed that function, which meant dev and production disagreed.
+ *  - The retired models it referenced (`gemini-2.0-flash`, `gemini-3.x-flash-lite`)
+ *    are shut down / never existed.
  *
- * The SDK now calls Gemini straight from the browser. The API key is the
- * Vite client-exposed variable `VITE_GEMINI_API_KEY` (every `VITE_`-prefixed
- * var is statically inlined into `import.meta.env` by Vite, so it MUST be safe
- * to ship to browsers — which a public-generation key is).
+ * The API key comes from `VITE_GEMINI_API_KEY`. Every `VITE_`-prefixed variable
+ * is statically inlined into the public bundle, so the key IS visible to users —
+ * acceptable for a simple front end, and it should be restricted in AI Studio /
+ * Google Cloud ("Restrict to Gemini API only" + quotas) since Google blocks keys
+ * that it detects as publicly leaked.
  *
  * The public shape (`GenerateResult` / `GenerateFailure`) is preserved so that
  * `generator.ts` and its local-template fallback keep working unchanged.
  */
 
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, type GenerateContentResponse } from '@google/genai';
 
 export type GenerateResult = {
   code: string;
@@ -27,13 +29,28 @@ export type GenerateResult = {
 };
 
 export type GenerateFailure = {
-  reason: 'no-key' | 'unavailable' | 'blocked' | 'network' | 'unknown';
+  reason: 'no-key' | 'unavailable' | 'blocked' | 'network' | 'not-found' | 'unknown';
   message: string;
   detail?: string;
 };
 
-/** Current stable Gemini model — replaces the non-existent gemini-3.x names. */
-const GEMINI_MODEL = 'gemini-2.0-flash';
+/**
+ * Gemini model ids, in priority order.
+ *
+ * Google retires models aggressively (`gemini-2.0-flash` is already shut down),
+ * so the preferred model is configurable through `VITE_GEMINI_MODEL` and any
+ * retired model (404 / NOT_FOUND) automatically falls through to the next one.
+ */
+const MODEL_CANDIDATES: readonly string[] = Array.from(
+  new Set(
+    [import.meta.env?.VITE_GEMINI_MODEL?.trim(), 'gemini-3.8-flash', 'gemini-3.5-flash'].filter(
+      (model): model is string => Boolean(model)
+    )
+  )
+);
+
+/** Upper bound on the generated HTML size (a full landing page is ~20k). */
+const MAX_OUTPUT_TOKENS = 32000;
 
 const SYSTEM_INSTRUCTION = [
   'You are إبنلي (Ebnili), an elite front-end engineer that turns a short product brief into a single, production-ready web page.',
@@ -57,6 +74,7 @@ const VALID_REASONS: readonly GenerateFailure['reason'][] = [
   'unavailable',
   'blocked',
   'network',
+  'not-found',
   'unknown',
 ];
 
@@ -118,6 +136,8 @@ function mapGeminiError(err: unknown): GenerateFailure {
     reason = 'blocked'; // FAILED_PRECONDITION (safety/rejected)
   } else if (gcode === 8) {
     reason = 'blocked'; // RESOURCE_EXHAUSTED (rate-limited/safety)
+  } else if (gcode === 5) {
+    reason = 'not-found'; // NOT_FOUND -> this model id no longer exists
   } else if (gcode === 14) {
     reason = 'unavailable';
   } else if (gcode === 13) {
@@ -126,6 +146,8 @@ function mapGeminiError(err: unknown): GenerateFailure {
     reason = 'no-key';
   } else if (httpStatus === 400 || httpStatus === 429) {
     reason = 'blocked';
+  } else if (httpStatus === 404) {
+    reason = 'not-found';
   } else if (httpStatus === 502 || httpStatus === 503 || httpStatus === 504) {
     reason = 'unavailable';
   }
@@ -169,34 +191,57 @@ export async function generateWithGemini(
   prompt: string,
   template?: string
 ): Promise<GenerateResult> {
-  let response: { text?: string };
+  const client = getAi(); // throws a `no-key` GenerateFailure when the key is unset
+  const contents = buildUserPrompt(prompt, template);
 
-  try {
-    const client = getAi();
-    response = await client.models.generateContent({
-      model: GEMINI_MODEL,
-      systemInstruction: SYSTEM_INSTRUCTION,
-      contents: buildUserPrompt(prompt, template),
-      config: {
-        temperature: 0.9,
-        topP: 0.95,
-        maxOutputTokens: 8192,
-      },
-    });
-  } catch (err) {
-    throw mapGeminiError(err);
+  let retired: GenerateFailure | undefined;
+
+  for (const model of MODEL_CANDIDATES) {
+    let response: GenerateContentResponse;
+
+    try {
+      response = await client.models.generateContent({
+        model,
+        contents,
+        config: {
+          // NOTE: `systemInstruction` MUST live inside `config` — the SDK's
+          // `GenerateContentParameters` only exposes `model`, `contents` and
+          // `config`, so a top-level systemInstruction would be ignored.
+          // `temperature` is deliberately left at the model default (1.0),
+          // which is what Google recommends for Gemini 3 output quality.
+          systemInstruction: SYSTEM_INSTRUCTION,
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
+        },
+      });
+    } catch (err) {
+      const failure = mapGeminiError(err);
+      // A retired model id (404 / NOT_FOUND) is the only failure worth
+      // retrying on the next candidate — everything else is a real error.
+      if (failure.reason !== 'not-found') throw failure;
+      retired = failure;
+      continue;
+    }
+
+    const code = response.text?.trim() ?? '';
+
+    if (!code) {
+      throw buildFailure(
+        'blocked',
+        'Gemini returned an empty response — likely blocked or safety-filtered.',
+        `response.text was empty (model=${model})`
+      );
+    }
+
+    return { code, model, source: 'gemini' };
   }
 
-  const code = (response?.text ?? '').trim();
-
-  if (!code) {
-    throw buildFailure(
-      'blocked',
-      'Gemini returned an empty response — likely blocked or safety-filtered.',
-      'response.text was empty'
-    );
-  }
-
-  return { code, model: GEMINI_MODEL, source: 'gemini' };
+  throw (
+    retired ??
+    buildFailure(
+      'unavailable',
+      'لا يوجد أي موديل Gemini متاح حاليًا.',
+      `tried: ${MODEL_CANDIDATES.join(', ')}`
+    )
+  );
 }
 

@@ -26,9 +26,22 @@ VITE_GEMINI_API_KEY=your-gemini-api-key-here
 ```
 
 > `VITE_ADMIN_EMAIL` محجوز للتوثيق فقط وغير مستخدم حاليًا في الكود (صلاحية المالك تُحدَّد
-> عبر `users.role = 'owner'`)، و`VITE_APP_URL` غير مُستخدَم في الكود أيضًا. المتغيران
-> المؤثران فعليًا هما `VITE_SUPABASE_URL` و `VITE_SUPABASE_ANON_KEY` وكذلك
-> `VITE_ORANGE_CASH_NUMBER` (يُقرأ في `src/lib/auth.ts`).
+> عبر `users.role = 'owner'`)، و`VITE_APP_URL` غير مُستخدَم في الكود أيضًا. المتغيرات
+> المؤثرة فعليًا هي `VITE_SUPABASE_URL` و `VITE_SUPABASE_ANON_KEY` و
+> `VITE_ORANGE_CASH_NUMBER` (يُقرأ في `src/lib/auth.ts`) و `VITE_GEMINI_API_KEY`
+> (يُقرأ في `src/lib/gemini.ts`). و`VITE_GEMINI_MODEL` اختياري لتثبيت موديل معيّن.
+
+> 🔓 **مفتاح Gemini مكشوف في المتصفح (بحكم التصميم):**
+> التوليد يتم مباشرة من المتصفح عبر `@google/genai` — لا يوجد وسيط سيرفر ولا مسار
+> `/api/generate` — لذلك `VITE_GEMINI_API_KEY` **يُدمج في حزمة JavaScript العامة** ويراه
+> أي زائر (DevTools → Network/Sources). هذا مقبول لموقع فرونت إند بسيط، لكن اعمل التالي
+> على الأقل:
+> 1. **AI Studio → API Keys** → على المفتاح: `Add restrictions` → **Restrict to Gemini API only**.
+> 2. **Google Cloud → Billing → Budgets & alerts**: حدّد سقفًا وتنبيهات لتجنّب استهلاك غير متوقع.
+> 3. تذكّر أن Google **تحجب تلقائيًا أي مفتاح يُكتشف كمسرّب علنًا** ("Your API key was reported
+>    as leaked") — لذلك عند التوقف المفاجئ للتوليد: أنشئ مفتاحًا جديدًا وحدّث `VITE_GEMINI_API_KEY`.
+> 4. الحل الأقوى لاحقًا (اختياري): وسيط صغير على Cloudflare Worker/Vercel Edge يخفي المفتاح
+>    ويتحقق من النطاق، أو Firebase App Check.
 
 ## 3) قاعدة البيانات
 
@@ -114,6 +127,14 @@ vercel env add VITE_SUPABASE_URL production,preview,development \
   --value "https://<project-id>.supabase.co" --yes --no-sensitive
 vercel env add VITE_SUPABASE_ANON_KEY production,preview,development \
   --value "<anon-key>" --yes --no-sensitive
+
+# مفتاح Gemini (يُدمج في حزمة الواجهة لأنه يُستخدَم من المتصفح مباشرة)
+vercel env add VITE_GEMINI_API_KEY production,preview,development \
+  --value "<gemini-api-key>" --yes --no-sensitive
+
+# (اختياري) تثبيت موديل Gemini — الافتراضي gemini-3.8-flash
+vercel env add VITE_GEMINI_MODEL production,preview,development \
+  --value "gemini-3.8-flash" --yes --no-sensitive
 ```
 
 > - `vercel env add` يجعل القيمة **sensitive افتراضيًا**، وVercel لا يدعم القيم الحسّاسة في
