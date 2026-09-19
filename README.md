@@ -22,6 +22,7 @@ VITE_SUPABASE_ANON_KEY=<anon-key>
 VITE_ORANGE_CASH_NUMBER=01207782741
 VITE_APP_URL=http://localhost:5173
 VITE_ADMIN_EMAIL=admin@example.com
+VITE_GEMINI_API_KEY=your-gemini-api-key-here
 ```
 
 > `VITE_ADMIN_EMAIL` محجوز للتوثيق فقط وغير مستخدم حاليًا في الكود (صلاحية المالك تُحدَّد
