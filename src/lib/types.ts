@@ -49,6 +49,19 @@ export interface ProjectVersion {
   created_at: string;
 }
 
+/**
+ * One turn of the builder conversation (Bolt.new-style chat column).
+ * Assistant turns may carry a live `status` while generation is running.
+ */
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  status?: string;
+  isError?: boolean;
+  createdAt: string;
+}
+
 export interface Template {
   id: string;
   name: string;

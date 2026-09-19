@@ -324,11 +324,36 @@ export function generateCode(prompt: string, template?: Template): string {
   }
 }
 
+export type StreamResult =
+  | { ok: true; code: string; source: 'gemini'; model: string }
+  | { ok: false; code: string; source: 'template'; failure: GenerateFailure };
+
+/**
+ * Models often wrap HTML in markdown fences even when told not to. Stripping
+ * them here keeps the preview from rendering a literal "```html" line.
+ */
+export function sanitizeHtml(raw: string): string {
+  let html = raw.trim();
+
+  const fenced = html.match(/^```[a-zA-Z]*\s*\n([\s\S]*?)\n?```$/);
+  if (fenced) html = fenced[1].trim();
+
+  html = html.replace(/^```[a-zA-Z]*\s*\n?/, '').replace(/\n?```\s*$/, '');
+
+  // Keep only the document if the model added prose before/after it.
+  const start = html.search(/<!DOCTYPE html|<html[\s>]/i);
+  if (start > 0) html = html.slice(start);
+  const end = html.toLowerCase().lastIndexOf('</html>');
+  if (end !== -1) html = html.slice(0, end + '</html>'.length);
+
+  return html.trim();
+}
+
 export async function streamGenerate(
   prompt: string,
   template: Template | undefined,
   callbacks: GenerationCallbacks
-): Promise<string> {
+): Promise<StreamResult> {
   const categoryLabel = template?.category ?? detectCategory(prompt);
 
   callbacks.onStatus('إرسال الوصف إلى Gemini');
@@ -341,10 +366,11 @@ export async function streamGenerate(
     await new Promise((r) => setTimeout(r, 120));
 
     callbacks.onStatus('تنظيف وتجهيز المعاينة');
+    const code = sanitizeHtml(result.code);
     await new Promise((r) => setTimeout(r, 120));
 
     callbacks.onStatus('تم — Gemini');
-    return result.code;
+    return { ok: true, code, source: 'gemini', model: result.model };
   } catch (err) {
     const failure = err as GenerateFailure;
 
@@ -364,6 +390,24 @@ export async function streamGenerate(
 
     const code = generateCode(prompt, template);
     callbacks.onStatus('تم — قالب محلي');
-    return code;
+    return { ok: false, code, source: 'template', failure };
+  }
+}
+
+/** Localised, user-facing description of a generation failure. */
+export function describeFailure(failure: GenerateFailure): string {
+  switch (failure.reason) {
+    case 'no-key':
+      return 'مفتاح Gemini غير مُضبوط. أضف VITE_GEMINI_API_KEY إلى ملف .env ثم أعد تشغيل السيرفر، أو أضِفه في متغيّرات بيئة Vercel وأعد النشر.';
+    case 'unavailable':
+      return 'خدمة Gemini مشغولة أو غير متاحة مؤقتًا. أعد المحاولة بعد لحظات.';
+    case 'blocked':
+      return 'رفض Gemini الطلب (قد يكون بسبب المحتوى أو تجاوز الحصة). جرّب صياغة أخرى للوصف.';
+    case 'network':
+      return 'تعذّر الوصول إلى خدمات Gemini من المتصفح. تحقّق من الاتصال أو من مانع الإعلانات.';
+    case 'not-found':
+      return 'موديل Gemini المطلوب لم يعد موجودًا. حدّث VITE_GEMINI_MODEL إلى موديل متاح (مثل gemini-3.8-flash).';
+    default:
+      return `تعذّر التوليد بالذكاء الاصطناعي${failure.detail ? ` (${failure.detail})` : ''}.`;
   }
 }

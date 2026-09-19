@@ -43,7 +43,7 @@ export type GenerateFailure = {
  */
 const MODEL_CANDIDATES: readonly string[] = Array.from(
   new Set(
-    [import.meta.env?.VITE_GEMINI_MODEL?.trim(), 'gemini-3.8-flash', 'gemini-3.5-flash'].filter(
+    [import.meta.env?.VITE_GEMINI_MODEL?.trim(), 'gemini-3.8-flash', 'gemini-3.6-flash'].filter(
       (model): model is string => Boolean(model)
     )
   )

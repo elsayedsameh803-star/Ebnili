@@ -1,6 +1,6 @@
 import { Bell, CheckCircle, AlertCircle, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface Notification {
   id: string;
@@ -16,7 +16,9 @@ export default function NotificationCenter() {
   const [lastFetched, setLastFetched] = useState<string | null>(null);
 
   const load = async () => {
-    if (loading) return;
+    // In local mode there is no activity log to poll — skip the request entirely
+    // instead of firing a doomed call every 8 seconds.
+    if (!isSupabaseConfigured || loading) return;
     setLoading(true);
     const { data, error } = await supabase
       .from('activity_log')
@@ -32,8 +34,10 @@ export default function NotificationCenter() {
 
   useEffect(() => {
     load();
+    if (!isSupabaseConfigured) return;
     const interval = setInterval(load, 8000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const unread = notifications.filter((n) => {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Receipt, Check, Clock, X, Loader2, ArrowLeft } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { listTransactions } from '@/lib/db';
 import { PRICING, type Transaction, type TransactionStatus } from '@/lib/types';
 
 interface TransactionHistoryProps {
@@ -18,13 +18,8 @@ export default function TransactionHistory({ onBack, onManageSubscription }: Tra
 
   const loadTransactions = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('transactions')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (!error && data) {
-      setTransactions(data as Transaction[]);
-    }
+    // `listTransactions` degrades to the browser cache instead of throwing.
+    setTransactions(await listTransactions());
     setLoading(false);
   };
 

@@ -10,7 +10,8 @@ import {
   Loader2,
   ShieldCheck,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { addLocalTransaction, saveLocalSubscription } from '@/lib/db';
 import { PRICING, ORANGE_CASH_NUMBER, type SubscriptionTier, type Subscription } from '@/lib/types';
 
 interface SubscriptionModalProps {
@@ -63,13 +64,49 @@ export default function SubscriptionModal({
     setSubmitting(true);
     try {
       const price = PRICING[selectedTier].price;
+      const now = new Date().toISOString();
+
+      // Local mode: keep the plan + receipt in the browser so checkout still
+      // completes instead of failing with a 404 from an unconfigured backend.
+      if (!isSupabaseConfigured) {
+        const subscription: Subscription = {
+          id: currentSubscription?.id ?? `sub_${now}`,
+          tier: selectedTier,
+          status: 'active',
+          sender_mobile: senderMobile,
+          activated_at: now,
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          created_at: currentSubscription?.created_at ?? now,
+        };
+        saveLocalSubscription(subscription);
+        addLocalTransaction({
+          id: `tx_${now}`,
+          subscription_id: subscription.id,
+          sender_mobile: senderMobile,
+          receipt_code: receiptCode,
+          amount: price,
+          status: 'verified',
+          tier: selectedTier,
+          created_at: now,
+          reviewed_at: now,
+        });
+
+        setStep('success');
+        onSubscribed();
+        return;
+      }
 
       let subscriptionId = currentSubscription?.id;
 
       if (currentSubscription) {
         const { error: updateErr } = await supabase
           .from('subscriptions')
-          .update({ tier: selectedTier, sender_mobile: senderMobile, status: 'active', activated_at: new Date().toISOString() })
+          .update({
+            tier: selectedTier,
+            sender_mobile: senderMobile,
+            status: 'active',
+            activated_at: now,
+          })
           .eq('id', currentSubscription.id);
         if (updateErr) throw updateErr;
       } else {
@@ -79,7 +116,7 @@ export default function SubscriptionModal({
             tier: selectedTier,
             status: 'active',
             sender_mobile: senderMobile,
-            activated_at: new Date().toISOString(),
+            activated_at: now,
           })
           .select()
           .single();
@@ -96,7 +133,7 @@ export default function SubscriptionModal({
           amount: price,
           status: 'verified',
           tier: selectedTier,
-          reviewed_at: new Date().toISOString(),
+          reviewed_at: now,
         });
       if (txErr) throw txErr;
 

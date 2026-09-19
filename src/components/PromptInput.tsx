@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Sparkles, ChevronDown } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowUp, Loader2, Sparkles, X } from 'lucide-react';
 import type { Template } from '@/lib/types';
 
 interface PromptInputProps {
@@ -10,13 +10,10 @@ interface PromptInputProps {
   onClearTemplate: () => void;
 }
 
-const SUGGESTIONS = [
-  'Create a modern e-commerce store with product grid and cart',
-  'Build a SaaS landing page with hero, features, and pricing',
-  'Design an analytics dashboard with charts and data tables',
-  'Make a portfolio website with projects gallery',
-];
-
+/**
+ * Bottom-docked composer (Bolt.new style): grows with the text, keeps the
+ * selected template as a removable chip, and submits with Enter.
+ */
 export default function PromptInput({
   onGenerate,
   isGenerating,
@@ -25,107 +22,80 @@ export default function PromptInput({
   onClearTemplate,
 }: PromptInputProps) {
   const [prompt, setPrompt] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px';
-    }
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
   }, [prompt]);
 
-  const handleSubmit = () => {
-    if (!prompt.trim() || isGenerating) return;
-    onGenerate(prompt.trim());
+  const submit = () => {
+    const value = prompt.trim();
+    if (!value || isGenerating) return;
+    onGenerate(value);
     setPrompt('');
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      handleSubmit();
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      submit();
     }
   };
 
-  return (
-    <div className="border-b border-slate-200 bg-white">
-      <div className="px-6 py-4">
-        {selectedTemplate && selectedTemplate.category !== 'blank' && (
-          <div className="mb-3 flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full">
-              <Sparkles size={12} />
-              {selectedTemplate.name}
-            </span>
-            <button
-              onClick={onClearTemplate}
-              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              Clear
-            </button>
-          </div>
-        )}
+  const hasTemplate = Boolean(selectedTemplate && selectedTemplate.category !== 'blank');
 
-        <div className="relative">
-          <textarea
-            ref={textareaRef}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Describe the web app you want to build..."
-            rows={1}
-            disabled={isGenerating}
-            className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pr-14 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-400 focus:bg-white transition-all disabled:opacity-60"
-          />
+  return (
+    <div className="border-t border-neutral-200 bg-white px-4 py-3">
+      {hasTemplate && (
+        <div className="mb-2 flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-semibold text-orange-600">
+            <Sparkles size={11} />
+            {selectedTemplate?.name}
+          </span>
           <button
-            onClick={handleSubmit}
-            disabled={!prompt.trim() || isGenerating}
-            className="absolute right-2.5 bottom-2.5 w-9 h-9 rounded-lg bg-slate-900 text-white flex items-center justify-center hover:bg-orange-500 disabled:opacity-30 disabled:hover:bg-slate-900 transition-all shrink-0"
-            title="Generate (Cmd/Ctrl + Enter)"
+            onClick={onClearTemplate}
+            className="rounded-full p-0.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
+            title="إزالة القالب"
           >
-            {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            <X size={12} />
           </button>
         </div>
+      )}
 
-        <div className="flex items-center justify-between mt-2.5">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowSuggestions(!showSuggestions)}
-              className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 transition-colors"
-            >
-              <Sparkles size={12} />
-              Suggestions
-              <ChevronDown size={12} className={`transition-transform ${showSuggestions ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
-          <span className="text-[11px] text-slate-400">⌘ + Enter to generate</span>
+      <div className="relative rounded-2xl border border-neutral-200 bg-neutral-50 transition-all focus-within:border-orange-400 focus-within:bg-white focus-within:shadow-sm">
+        <textarea
+          ref={textareaRef}
+          value={prompt}
+          onChange={(event) => setPrompt(event.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={isGenerating ? 'جارٍ التوليد...' : 'صف الموقع أو التطبيق الذي تريد بناءه...'}
+          rows={1}
+          disabled={isGenerating}
+          className="max-h-[180px] w-full resize-none bg-transparent px-4 py-3 pb-11 text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none disabled:opacity-60"
+        />
+
+        <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-center justify-between">
+          <span className="text-[10px] text-neutral-400">Enter للإرسال · Shift+Enter لسطر جديد</span>
+          <button
+            onClick={submit}
+            disabled={!prompt.trim() || isGenerating}
+            className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-xl bg-neutral-900 text-white transition-all hover:bg-orange-500 disabled:opacity-30 disabled:hover:bg-neutral-900"
+            title="توليد"
+          >
+            {isGenerating ? <Loader2 size={15} className="animate-spin" /> : <ArrowUp size={15} />}
+          </button>
         </div>
-
-        {showSuggestions && (
-          <div className="mt-2 space-y-1">
-            {SUGGESTIONS.map((suggestion, i) => (
-              <button
-                key={i}
-                onClick={() => { setPrompt(suggestion); setShowSuggestions(false); }}
-                className="block w-full text-left text-xs text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors"
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {isGenerating && (
-          <div className="mt-3 flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-orange-50 border border-orange-100">
-            <div className="flex gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-            <span className="text-xs font-medium text-orange-700">{streamStatus}...</span>
-          </div>
-        )}
       </div>
+
+      {isGenerating && streamStatus && (
+        <div className="mt-2 flex items-center gap-2 text-[11px] font-medium text-orange-600">
+          <Loader2 size={11} className="animate-spin" />
+          {streamStatus}
+        </div>
+      )}
     </div>
   );
 }
